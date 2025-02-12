@@ -84,12 +84,12 @@ systemctl start NetworkManager
 # Création des utilisateurs
 useradd -m -G wheel -s /bin/bash user
 echo "user:azerty123" | chpasswd
-useradd -m -G users -s /bin/bash fils
-echo "fils:azerty123" | chpasswd
+useradd -m -G users -s /bin/bash user2
+echo "user2:azerty123" | chpasswd
 
-# Définir le clavier AZERTY pour user et fils
+# Définir le clavier AZERTY pour user et user2
 echo "setxkbmap fr" >> /home/user/.bashrc
-echo "setxkbmap fr" >> /home/fils/.bashrc
+echo "setxkbmap fr" >> /home/user2/.bashrc
 echo "setxkbmap fr" >> /etc/profile
 
 # Définir le clavier au niveau système
@@ -97,7 +97,7 @@ echo "KEYMAP=fr-latin1" > /etc/vconsole.conf
 
 # Changer les permissions pour que chaque user puisse modifier son propre fichier .bashrc
 chown user:user /home/user/.bashrc
-chown fils:fils /home/fils/.bashrc
+chown user2:user2 /home/user2/.bashrc
 
 # Ajouter l'utilisateur "user" au groupe sudoers
 echo "[+] Ajout de l'utilisateur 'user' dans sudoers..."
@@ -105,32 +105,32 @@ usermod -aG wheel user
 echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers.d/wheel
 chmod 0440 /etc/sudoers.d/wheel
 
-# Ajouter l'utilisateur "fils" au groupe sudoers
-echo "[+] Ajout de l'utilisateur 'fils' dans sudoers..."
-usermod -aG wheel fils
+# Ajouter l'utilisateur "user2" au groupe sudoers
+echo "[+] Ajout de l'utilisateur 'user2' dans sudoers..."
+usermod -aG wheel user2
 echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers.d/wheel
 chmod 0440 /etc/sudoers.d/wheel
 
 pacman -Sy --noconfirm vim
-echo "export EDITOR=vim" >> /home/fils/.bashrc
-chown fils:fils /home/fils/.bashrc
+echo "export EDITOR=vim" >> /home/user2/.bashrc
+chown user2:user2 /home/user2/.bashrc
 
 # Ajouter user et fils aux groupes nécessaires
 usermod -aG network,wheel user
-usermod -aG network,wheel fils
+usermod -aG network,wheel user2
 
 # Autoriser user et fils à gérer NetworkManager
-echo "[+] Autorisation de gestion du réseau pour user et fils..."
+echo "[+] Autorisation de gestion du réseau pour user et user2..."
 echo "%wheel ALL=(ALL) NOPASSWD: /usr/bin/nmcli" >> /etc/sudoers.d/network
 chmod 0440 /etc/sudoers.d/network
 
 echo "[+] Test de la connexion Internet..."
 ping -c 4 archlinux.org
 
-# Création du dossier partagé père/fils
+# Création du dossier partagé père/user2
 mkdir /home/user/shared
-mkdir /home/fils/shared
-chown user:fils /home/user/shared
+mkdir /home/user2/shared
+chown user:user2 /home/user/shared
 chmod 770 /home/user/shared
 
 # Installation des logiciels utiles
