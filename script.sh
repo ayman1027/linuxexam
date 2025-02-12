@@ -18,7 +18,6 @@ parted /dev/sda --script mklabel gpt
 
 # Partitionnement en GPT + ESP + LUKS
 echo "[+] Création des partitions..."
-parted /dev/sda --script mklabel gpt
 parted /dev/sda --script mkpart ESP fat32 1MiB 513MiB
 parted /dev/sda --script set 1 esp on
 parted /dev/sda --script mkpart LUKS ext4 513MiB 100%
@@ -56,27 +55,25 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 # Chroot dans le nouveau système et configuration
 arch-chroot /mnt <<EOF
+
 # Configuration de la timezone, locale et hostname
 ln -sf /usr/share/zoneinfo/Europe/Paris /etc/localtime
 hwclock --systohc
 echo "LANG=fr_FR.UTF-8" > /etc/locale.conf
 echo "archlinux" > /etc/hostname
 
-# Ajout des modules LUKS + LVM dans mkinitcpio
-echo "[+] Ajout des modules encrypt et lvm2 à mkinitcpio..."
+# Ajouter les modules LUKS + LVM à mkinitcpio
 sed -i 's/^HOOKS=(.*)/HOOKS=(base udev autodetect modconf block encrypt lvm2 filesystems keyboard fsck)/' /etc/mkinitcpio.conf
 mkinitcpio -P
 
 # Installation de GRUB avec support LUKS
 echo "[+] Installation de GRUB..."
 pacman -Sy --noconfirm grub efibootmgr
-
 echo "GRUB_CMDLINE_LINUX=\"cryptdevice=/dev/sda2:cryptroot root=/dev/mapper/vg0-root\"" > /etc/default/grub
 grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB --recheck
 grub-mkconfig -o /boot/grub/grub.cfg
 
 # Installer et activer NetworkManager
-echo "[+] Installation et activation de NetworkManager..."
 pacman -Sy --noconfirm networkmanager
 systemctl enable NetworkManager
 systemctl start NetworkManager
@@ -92,57 +89,32 @@ echo "setxkbmap fr" >> /home/user/.bashrc
 echo "setxkbmap fr" >> /home/user2/.bashrc
 echo "setxkbmap fr" >> /etc/profile
 
-# Définir le clavier au niveau système
-echo "KEYMAP=fr-latin1" > /etc/vconsole.conf
-
-# Changer les permissions pour que chaque user puisse modifier son propre fichier .bashrc
-chown user:user /home/user/.bashrc
-chown user2:user2 /home/user2/.bashrc
-
-# Ajouter l'utilisateur "user" au groupe sudoers
-echo "[+] Ajout de l'utilisateur 'user' dans sudoers..."
-usermod -aG wheel user
-echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers.d/wheel
-chmod 0440 /etc/sudoers.d/wheel
-
 # Ajouter l'utilisateur "user2" au groupe sudoers
-echo "[+] Ajout de l'utilisateur 'user2' dans sudoers..."
-usermod -aG wheel user2
 echo "%wheel ALL=(ALL:ALL) ALL" >> /etc/sudoers.d/wheel
 chmod 0440 /etc/sudoers.d/wheel
 
-pacman -Sy --noconfirm vim
-echo "export EDITOR=vim" >> /home/user2/.bashrc
-chown user2:user2 /home/user2/.bashrc
+# 🔹 Installation d'Hyperland et de ses dépendances
+pacman -Sy --noconfirm hyprland wayland wayland-utils xorg-xwayland wlroots
+pacman -Sy --noconfirm polkit seatd libseat
+pacman -Sy --noconfirm xf86-video-vmware mesa vulkan-intel libglvnd
+pacman -Sy --noconfirm alacritty firefox neofetch htop git base-devel rofi pavucontrol
 
-# Ajouter user et fils aux groupes nécessaires
-usermod -aG network,wheel user
-usermod -aG network,wheel user2
+# Activer seatd pour Hyperland
+systemctl enable seatd
+systemctl start seatd
 
-# Autoriser user et fils à gérer NetworkManager
-echo "[+] Autorisation de gestion du réseau pour user et user2..."
-echo "%wheel ALL=(ALL) NOPASSWD: /usr/bin/nmcli" >> /etc/sudoers.d/network
-chmod 0440 /etc/sudoers.d/network
+# 🔹 Configuration de Hyperland
+mkdir -p /home/user2/.config/hypr
+cp /usr/share/hyprland/hyprland.conf /home/user2/.config/hypr/hyprland.conf
 
-echo "[+] Test de la connexion Internet..."
-ping -c 4 archlinux.org
+echo "exec Hyprland" > /home/user2/.xinitrc
+echo "XDG_SESSION_TYPE=wayland" >> /home/user2/.bashrc
+echo "dbus-run-session Hyprland" > /home/user2/.config/hypr/start.sh
+chmod +x /home/user2/.config/hypr/start.sh
 
-# Création du dossier partagé père/user2
-mkdir /home/user/shared
-mkdir /home/user2/shared
-chown user:user2 /home/user/shared
-chmod 770 /home/user/shared
+# Ajouter Hyperland au démarrage
+echo "exec /home/user2/.config/hypr/start.sh" >> /home/user2/.bash_profile
 
-# Installation des logiciels utiles
-pacman -Sy --noconfirm hyprland virtualbox virtualbox-host-dkms linux-headers firefox neofetch htop git base-devel
-pacman -Sy --noconfirm neofetch htop btop lsd ranger
-pacman -Sy --noconfirm pacman-contrib reflector
-pacman -Sy --noconfirm gparted baobab ncdu
-pacman -Sy --noconfirm networkmanager nm-connection-editor
-pacman -Sy --noconfirm firefox alacritty rofi pavucontrol
-
-# Ajout de GRUB dans les entrées EFI
-efibootmgr --create --disk /dev/sda --part 1 --loader /EFI/GRUB/grubx64.efi --label "ArchLinux" --verbose
-EOF
-
+# Finalisation
 echo "[+] Installation terminée ! Redémarre maintenant avec : reboot"
+EOF
